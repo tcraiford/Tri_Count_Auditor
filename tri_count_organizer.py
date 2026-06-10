@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 
-required = ["trimesh", "fbxloader"]
+required = ["trimesh", "fbxloader", "PySide6"]
 missing = []
 for i in required:
     try:
@@ -25,8 +25,6 @@ from fbxloader import FBXLoader
 
 def get_directory():
     directory = input("Enter directory to scan: ")
-    if not directory:
-        directory = r"C:\Users\traiford\Desktop\Work\Atlas\DM\DM_ception"
     while not os.path.exists(directory):
         print("Directory does not exist or is unreachable.")
         directory = input("Enter a directory path:")

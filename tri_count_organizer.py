@@ -2,6 +2,10 @@ import os
 import subprocess
 import sys
 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
+                               QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QPushButton, QTableWidget, QTableWidgetItem)
+
 required = ["trimesh", "fbxloader", "PySide6"]
 missing = []
 for i in required:
@@ -25,6 +29,8 @@ from fbxloader import FBXLoader
 
 def get_directory():
     directory = input("Enter directory to scan: ")
+    if not directory:
+        directory = r"C:\Users\traiford\Desktop\Work\Atlas\DM\DM_ception"
     while not os.path.exists(directory):
         print("Directory does not exist or is unreachable.")
         directory = input("Enter a directory path:")
@@ -144,7 +150,75 @@ def main():
             if new_directory == True:
                 break
 
+#defines the class MainWindow which is called by the if main bellow
+#creates the default values for each of the new variables we're creating inside self
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Triangle Count Organizer")
+        self.directory = ""
+        self.threshold = 100000
+        self.green = 50000
+        self.sort_type = "n"
+        self.file_count = {}
+        self.failed_load = []
+        self.directory_line = QLineEdit()
+        self.results_table = QTableWidget(1, 2)
+        self.results_table.setHorizontalHeaderLabels(["File Name", "Triangle Count"])
+
+
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        # Layout main_layout is where all the individual widgets and row/collum layouts get added to
+        main_layout = QVBoxLayout(central_widget)
+
+        # Create a label widget and add it to main_layout
+        description = QLabel("Scan a directory for 3D geo files and display triangle counts")
+
+        # Create buttons that don't need self. Then tell them what they do by connecting them to their method
+        open_dir_button = QPushButton("Open Directory")
+        browse_button = QPushButton("Browse")
+        scan_button = QPushButton("Scan")
+        scan_button.clicked.connect(self.populate_table)
+
+        # Create the layout dir_layout and then add each widget to it individually
+        dir_layout = QHBoxLayout()
+        dir_layout.addWidget(self.directory_line)
+        dir_layout.addWidget(browse_button)
+        dir_layout.addWidget(open_dir_button)
+
+        # Create the layout scan_layout and then add the scan widget to it
+        scan_layout = QHBoxLayout()
+        scan_layout.addWidget(scan_button)
+
+        # Define the order of the items added to the main window
+        main_layout.addWidget(description)
+        main_layout.addLayout(dir_layout)
+        main_layout.addLayout(scan_layout)
+        main_layout.addWidget(self.results_table)
+
+    def populate_table(self):
+        # Once scan button pressed, this takes whatever is in self.directory_line input and defines directory with it
+        directory = self.directory_line.text()
+
+        # Call the functions from the cli using the new inputted directory from the gui
+        my_list = scan_files(directory, supported_formats)
+        self.file_count, self.failed_load = get_tri_counts(my_list, directory)
+
+        row_val = 0
+        self.results_table.setRowCount(len(self.file_count))
+        for key, val in self.file_count.items():
+            self.results_table.setItem(row_val, 0, QTableWidgetItem(key))
+            self.results_table.setItem(row_val, 1, QTableWidgetItem(str(val)))
+            row_val += 1
+
+
+
 supported_formats = (".obj", ".fbx", ".glb", ".gltf", ".stl")
 
 if __name__ == "__main__":
-    main()
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    app.exec()

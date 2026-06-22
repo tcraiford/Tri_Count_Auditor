@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                                QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                                QPushButton, QTableWidget, QTableWidgetItem,
                                QFileDialog)
+from PySide6.QtGui import(QColor)
 
 required = ["trimesh", "fbxloader", "PySide6"]
 missing = []
@@ -161,7 +162,7 @@ class MainWindow(QMainWindow):
         self.sort_type = "n"
         self.file_count = {}
         self.failed_load = []
-        self.user_threshold = QLineEdit("100000")
+        self.user_threshold = QLineEdit("Tri-Count Threshold (100000)")
         self.directory_line = QLineEdit()
         self.results_table = QTableWidget(1, 2)
         self.results_table.setHorizontalHeaderLabels(["File Name", "Triangle Count"])
@@ -216,12 +217,21 @@ class MainWindow(QMainWindow):
         os.startfile(directory)
 
     def populate_table(self):
-        # Get the 50% of whatever the threshold is and use floor division for a whole number value
-        threshold = int(self.user_threshold.text())
-        green = threshold // 2
+        # Establish Hex codes as easy variables
+        red = "#ff0800"
+        green = "#4cbb17"
+        yellow = "#fce205"
+
+
 
         # Once scan button pressed, this takes whatever is in self.directory_line input and defines directory with it
         directory = self.directory_line.text()
+
+        # If user doesn't put in valid threshold, it will default to 100000
+        try:
+            threshold = int(self.user_threshold.text())
+        except:
+            threshold = 100000
 
         # Call the functions from the cli using the new inputted directory from the gui
         my_list = scan_files(directory, supported_formats)
@@ -233,8 +243,22 @@ class MainWindow(QMainWindow):
         row_val = 0
         self.results_table.setRowCount(len(self.file_count))
         for key, val in self.file_count.items():
-            self.results_table.setItem(row_val, 0, QTableWidgetItem(key))
-            self.results_table.setItem(row_val, 1, QTableWidgetItem(str(val)))
+            # Convert key and val to QTable items that we can apply a QColor to
+            line_key = QTableWidgetItem(key)
+            line_val = QTableWidgetItem(str(val))
+            # Determine what Color the text should be
+            if int(val) > threshold:
+                color = red
+            elif int(val) < (threshold // 2):
+                color = green
+            else:
+                color = yellow
+
+            line_key.setForeground(QColor(color))
+            line_val.setForeground(QColor(color))
+
+            self.results_table.setItem(row_val, 0, line_key)
+            self.results_table.setItem(row_val, 1, line_val)
             row_val += 1
 
         # Re-enable sorting by clicking on header after table is filled

@@ -4,7 +4,8 @@ import sys
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                                QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QTableWidget, QTableWidgetItem)
+                               QPushButton, QTableWidget, QTableWidgetItem,
+                               QFileDialog)
 
 required = ["trimesh", "fbxloader", "PySide6"]
 missing = []
@@ -157,11 +158,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Triangle Count Organizer")
         self.directory = ""
-        self.threshold = 100000
-        self.green = 50000
         self.sort_type = "n"
         self.file_count = {}
         self.failed_load = []
+        self.user_threshold = QLineEdit("100000")
         self.directory_line = QLineEdit()
         self.results_table = QTableWidget(1, 2)
         self.results_table.setHorizontalHeaderLabels(["File Name", "Triangle Count"])
@@ -178,7 +178,9 @@ class MainWindow(QMainWindow):
 
         # Create buttons that don't need self. Then tell them what they do by connecting them to their method
         open_dir_button = QPushButton("Open Directory")
+        open_dir_button.clicked.connect(self.open_directory)
         browse_button = QPushButton("Browse")
+        browse_button.clicked.connect(self.browse_window)
         scan_button = QPushButton("Scan")
         scan_button.clicked.connect(self.populate_table)
 
@@ -188,17 +190,36 @@ class MainWindow(QMainWindow):
         dir_layout.addWidget(browse_button)
         dir_layout.addWidget(open_dir_button)
 
+
+
         # Create the layout scan_layout and then add the scan widget to it
         scan_layout = QHBoxLayout()
+        scan_layout.addWidget(self.user_threshold)
         scan_layout.addWidget(scan_button)
+
 
         # Define the order of the items added to the main window
         main_layout.addWidget(description)
         main_layout.addLayout(dir_layout)
         main_layout.addLayout(scan_layout)
         main_layout.addWidget(self.results_table)
+        # Enables sorting by clicking the header of the table
+        self.results_table.setSortingEnabled(True)
+
+    def browse_window(self):
+        user_directory = QFileDialog.getExistingDirectory()
+        self.directory_line.setText(user_directory)
+        self.populate_table()
+
+    def open_directory(self):
+        directory = self.directory_line.text()
+        os.startfile(directory)
 
     def populate_table(self):
+        # Get the 50% of whatever the threshold is and use floor division for a whole number value
+        threshold = int(self.user_threshold.text())
+        green = threshold // 2
+
         # Once scan button pressed, this takes whatever is in self.directory_line input and defines directory with it
         directory = self.directory_line.text()
 
@@ -206,12 +227,18 @@ class MainWindow(QMainWindow):
         my_list = scan_files(directory, supported_formats)
         self.file_count, self.failed_load = get_tri_counts(my_list, directory)
 
+        # Disables sorting while table is being populated. Need to re-enable after
+        self.results_table.setSortingEnabled(False)
+
         row_val = 0
         self.results_table.setRowCount(len(self.file_count))
         for key, val in self.file_count.items():
             self.results_table.setItem(row_val, 0, QTableWidgetItem(key))
             self.results_table.setItem(row_val, 1, QTableWidgetItem(str(val)))
             row_val += 1
+
+        # Re-enable sorting by clicking on header after table is filled
+        self.results_table.setSortingEnabled(True)
 
 
 

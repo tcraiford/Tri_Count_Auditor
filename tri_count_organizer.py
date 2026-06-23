@@ -162,10 +162,13 @@ class MainWindow(QMainWindow):
         self.sort_type = "n"
         self.file_count = {}
         self.failed_load = []
-        self.user_threshold = QLineEdit("Tri-Count Threshold (100000)")
+        self.user_threshold = QLineEdit("Threshold (100000)")
+        self.user_threshold.returnPressed.connect(self.populate_table)
         self.directory_line = QLineEdit()
+        self.directory_line.returnPressed.connect(self.scan_and_populate_table)
         self.results_table = QTableWidget(1, 2)
         self.results_table.setHorizontalHeaderLabels(["File Name", "Triangle Count"])
+        self.failure_label = QLabel("")
 
 
         central_widget = QWidget()
@@ -182,8 +185,10 @@ class MainWindow(QMainWindow):
         open_dir_button.clicked.connect(self.open_directory)
         browse_button = QPushButton("Browse")
         browse_button.clicked.connect(self.browse_window)
+        threshold_button = QPushButton("Set Threshold")
+        threshold_button.clicked.connect(self.populate_table)
         scan_button = QPushButton("Scan")
-        scan_button.clicked.connect(self.populate_table)
+        scan_button.clicked.connect(self.scan_and_populate_table)
 
         # Create the layout dir_layout and then add each widget to it individually
         dir_layout = QHBoxLayout()
@@ -196,6 +201,7 @@ class MainWindow(QMainWindow):
         # Create the layout scan_layout and then add the scan widget to it
         scan_layout = QHBoxLayout()
         scan_layout.addWidget(self.user_threshold)
+        scan_layout.addWidget(threshold_button)
         scan_layout.addWidget(scan_button)
 
 
@@ -204,17 +210,26 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(dir_layout)
         main_layout.addLayout(scan_layout)
         main_layout.addWidget(self.results_table)
+        main_layout.addWidget(self.failure_label)
+        self.failure_label.hide()
         # Enables sorting by clicking the header of the table
         self.results_table.setSortingEnabled(True)
 
     def browse_window(self):
         user_directory = QFileDialog.getExistingDirectory()
         self.directory_line.setText(user_directory)
-        self.populate_table()
+        self.scan_and_populate_table()
 
     def open_directory(self):
         directory = self.directory_line.text()
         os.startfile(directory)
+
+    def scan_user_directory(self):
+        # Once scan button pressed, this takes whatever is in self.directory_line input and defines directory with it
+        directory = self.directory_line.text()
+        # Call the functions from the cli using the new inputted directory from the gui
+        my_list = scan_files(directory, supported_formats)
+        self.file_count, self.failed_load = get_tri_counts(my_list, directory)
 
     def populate_table(self):
         # Establish Hex codes as easy variables
@@ -222,23 +237,20 @@ class MainWindow(QMainWindow):
         green = "#4cbb17"
         yellow = "#fce205"
 
-
-
-        # Once scan button pressed, this takes whatever is in self.directory_line input and defines directory with it
-        directory = self.directory_line.text()
-
         # If user doesn't put in valid threshold, it will default to 100000
         try:
             threshold = int(self.user_threshold.text())
         except:
             threshold = 100000
 
-        # Call the functions from the cli using the new inputted directory from the gui
-        my_list = scan_files(directory, supported_formats)
-        self.file_count, self.failed_load = get_tri_counts(my_list, directory)
-
         # Disables sorting while table is being populated. Need to re-enable after
         self.results_table.setSortingEnabled(False)
+
+        if self.failed_load:
+            self.failure_label.show()
+            self.failure_label.setText(f"{len(self.failed_load)} failed to load.")
+        else:
+            self.failure_label.hide()
 
         row_val = 0
         self.results_table.setRowCount(len(self.file_count))
@@ -263,6 +275,10 @@ class MainWindow(QMainWindow):
 
         # Re-enable sorting by clicking on header after table is filled
         self.results_table.setSortingEnabled(True)
+
+    def scan_and_populate_table(self):
+        self.scan_user_directory()
+        self.populate_table()
 
 
 

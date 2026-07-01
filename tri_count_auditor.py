@@ -75,7 +75,7 @@ def get_tri_counts(my_list, directory):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Triangle Count Organizer")
+        self.setWindowTitle("Triangle Count Auditor")
         self.directory = ""
         self.sort_type = "n"
         self.file_count = {}

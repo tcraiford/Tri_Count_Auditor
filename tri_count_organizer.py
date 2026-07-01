@@ -30,9 +30,17 @@ if missing:
 from fbxloader import FBXLoader
 
 
-def scan_files(directory, supported_formats):
+def scan_files(directory, supported_formats, user_recursive_depth):
     my_list = []
     for root, dirs, files in os.walk(directory):
+
+        #calculates the folder depth by removing the user directory from the current directory and counting how many folders deep you are
+        #value starts at 1 so no folders deep has folder_depth = 1
+        folder_depth = len(os.path.relpath(root, directory).split("\\"))
+        if folder_depth == user_recursive_depth:
+            #walk looks at dirs each time it is about to run so clearing it out makes walk think there are no more recursive folders
+            dirs.clear()
+
         for item in files:
             if item.endswith(supported_formats):
                 my_list.append(os.path.join(root, item))
@@ -45,7 +53,6 @@ def get_tri_counts(my_list, directory):
     for item in my_list:
         base_name = os.path.relpath(item, directory)
 
-
         #if file is a fbx, load into variable fbx by FBXLoader and put into variable model otherwise assume as obj
         try:
             if item.endswith(".fbx"):
@@ -53,9 +60,11 @@ def get_tri_counts(my_list, directory):
                 model = fbx.export_trimesh()
             else:
                 model = trimesh.load(item)
+            #get the file size in bytes and convert to kb
+            file_size = (os.path.getsize(item) / (1024 ** 2))
             tri_count = len(model.triangles)
             #takes the dict, file_count, and makes base_name the key and tri_count the value for that key
-            file_count[base_name] = tri_count
+            file_count[base_name] = [tri_count, file_size]
         except:
             failed_load.append(base_name)
     return file_count, failed_load
@@ -75,9 +84,11 @@ class MainWindow(QMainWindow):
         self.user_threshold.returnPressed.connect(self.populate_table)
         self.directory_line = QLineEdit()
         self.directory_line.returnPressed.connect(self.scan_and_populate_table)
-        self.results_table = QTableWidget(1, 2)
-        self.results_table.setHorizontalHeaderLabels(["File Name", "Triangle Count"])
+        self.results_table = QTableWidget(1, 3)
+        self.results_table.setHorizontalHeaderLabels(["File Name", "Triangle Count", "File Size (mb)"])
         self.failure_label = QLabel("")
+        self.user_recursive_depth = QLineEdit("Folder Search Depth (4)")
+        self.user_recursive_depth.returnPressed.connect(self.scan_and_populate_table)
 
 
         central_widget = QWidget()
@@ -118,6 +129,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(description)
         main_layout.addLayout(dir_layout)
         main_layout.addLayout(scan_layout)
+        main_layout.addWidget(self.user_recursive_depth)
         main_layout.addWidget(self.results_table)
         main_layout.addWidget(self.failure_label)
         self.failure_label.hide()
@@ -136,8 +148,12 @@ class MainWindow(QMainWindow):
     def scan_user_directory(self):
         # Once scan button pressed, this takes whatever is in self.directory_line input and defines directory with it
         directory = self.directory_line.text()
+        try:
+            user_recursive_depth = int(self.user_recursive_depth.text())
+        except:
+            user_recursive_depth = 4
         # Call the functions from the cli using the new inputted directory from the gui
-        my_list = scan_files(directory, supported_formats)
+        my_list = scan_files(directory, supported_formats, user_recursive_depth)
         self.file_count, self.failed_load = get_tri_counts(my_list, directory)
 
     def populate_table(self):
@@ -155,6 +171,7 @@ class MainWindow(QMainWindow):
         # Disables sorting while table is being populated. Need to re-enable after
         self.results_table.setSortingEnabled(False)
 
+        #if there's any failed loads, it'll tell you
         if self.failed_load:
             self.failure_label.show()
             self.failure_label.setText(f"{len(self.failed_load)} failed to load.")
@@ -166,20 +183,24 @@ class MainWindow(QMainWindow):
         for key, val in self.file_count.items():
             # Convert key and val to QTable items that we can apply a QColor to
             line_key = QTableWidgetItem(key)
-            line_val = QTableWidgetItem(str(val))
+            line_tri = QTableWidgetItem(str(val[0]))
+            size_string = (f"{val[1]:.2f} mb")
+            line_size = QTableWidgetItem(size_string)
             # Determine what Color the text should be
-            if int(val) > threshold:
+            if int(val[0]) > threshold:
                 color = red
-            elif int(val) < (threshold // 2):
+            elif int(val[0]) < (threshold // 2):
                 color = green
             else:
                 color = yellow
 
             line_key.setForeground(QColor(color))
-            line_val.setForeground(QColor(color))
+            line_tri.setForeground(QColor(color))
+            line_size.setForeground(QColor(color))
 
             self.results_table.setItem(row_val, 0, line_key)
-            self.results_table.setItem(row_val, 1, line_val)
+            self.results_table.setItem(row_val, 1, line_tri)
+            self.results_table.setItem(row_val, 2, line_size)
             row_val += 1
 
         # Re-enable sorting by clicking on header after table is filled
